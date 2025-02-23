@@ -1,6 +1,7 @@
 import json
 import tempfile
 import geojson
+import os
 import pandas as pd
 import folium
 import altair as alt
@@ -90,22 +91,58 @@ st.markdown(
 
 st.sidebar.title('Master ADABI')
 st.sidebar.write(
-    "Questa pagina è un elaborato frutto di un progetto di tirocinio. "
+    "Questa pagina è un elaborato frutto di un progetto di tirocinio. ")
+st.sidebar.write(
     "La prima pagina contiene delle statistiche ISTAT, mentre la seconda è una dashboard interattiva.")
 st.sidebar.write(
 "È possibile interagire con la mappa di Cuneo: cliccando su un comune, verranno visualizzate le statistiche di riferimento.")
 
-left_co, cent_co,last_co = st.columns([1, 3 ,1])
+left_co, cent_co, last_co = st.columns([1, 3, 1])
 
-st.markdown('<div class=" main-container">', unsafe_allow_html=True)
-
-st.markdown('<div class="image-container">', unsafe_allow_html=True)
 with cent_co:
     st.title(":green[IMM]IGR:red[ITALY]")
-    st.image("/Users/simone/Desktop/tirocinio/GitHub/img/albanesi_sbarco-in-Puglia.jpg", caption="L'arrivo del mercantile Vlora con 20mila albanesi a bordo. 8 Agosto 1991 (Fotogramma).")
-st.markdown("</div>", unsafe_allow_html=True)
-st.markdown("</div>", unsafe_allow_html=True)
+    image_container = st.container()  # Contenitore dedicato per l'immagine
 
+img_folder = "img"
+
+# Verifica dell'esistenza della cartella e caricamento delle immagini
+if os.path.exists(img_folder):
+    # Creazione della lista dei file immagine con estensioni specifiche
+    image_files = sorted([os.path.join(img_folder, f) for f in os.listdir(img_folder) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif'))])
+
+    # Verifica se sono presenti immagini nella cartella
+    if image_files:
+        # Inizializzazione dello stato della sessione per il contatore, se non già presente
+        if 'counter' not in st.session_state:
+            st.session_state.counter = 0
+
+        # Funzione per visualizzare l'immagine corrente
+        def show_photo():
+            # Svuota il contenitore prima di mostrare la nuova immagine
+            image_container.empty()
+            # Ottenimento del percorso dell'immagine corrente
+            photo = image_files[st.session_state.counter]
+            # Visualizzazione dell'immagine con didascalia nel contenitore dedicato
+            image_container.image(photo, caption=os.path.basename(photo))
+
+        # Visualizzazione iniziale dell'immagine
+        #show_photo()
+
+        # Pulsante per mostrare l'immagine successiva, posizionato nella colonna di destra
+        with last_co:
+            if st.button("⏭️"):
+                # Incrementa il contatore prima di mostrare la nuova immagine
+                st.session_state.counter = (st.session_state.counter + 1) % len(image_files)
+                show_photo()
+    else:
+        # Messaggio informativo se non sono presenti immagini nella cartella
+        with cent_co:
+            st.info("Nessuna immagine trovata nella cartella 'img'.")
+else:
+    # Messaggio informativo se la cartella non esiste
+    with cent_co:
+        st.info("La cartella 'img' non esiste. Assicurati che sia presente nella directory principale dell'applicazione.")
+        
 st.markdown("<div class='title-container'>L'immigrazione straniera in numeri</div>", unsafe_allow_html=True)
 
 col_map1, col_map2 = st.columns([1.5, 1.5])  # Due colonne: numeri e mappa
@@ -207,8 +244,8 @@ folium.GeoJson(
 
 # ✅ 10. Mostrare la mappa in Streamlit
 with col_map2:
-        with st.container(height = 500, border = False ):
-            st_map = st_folium(map, width=900, height=450)
+        with st.container(height = 700, border = False ):
+            st_map = st_folium(m, width=900, height=700)
 
 
 st.markdown('<div class="title-container">Stranieri residenti al 1° gennaio 2024</div>', unsafe_allow_html=True)

@@ -3,6 +3,7 @@ import tempfile
 import geojson
 import pandas as pd
 import folium
+import os
 import altair as alt
 import geopandas as gpd
 import requests
@@ -25,9 +26,11 @@ st.caption('Mappa Cuneo')
 
 st.sidebar.title('Master ADABI')
 st.sidebar.write(
-    "Questa pagina è un elaborato frutto di un progetto di tirocinio. "
-    "La prima pagina contiene delle statistiche ISTAT, mentre la seconda è una dashboard interattiva."
-"È possibile interagire con la mappa di Cuneo: cliccando su un comune, verranno visualizzate le statistiche di riferimento.")
+    "Questa pagina è un elaborato frutto di un progetto di tirocinio. ")
+st.sidebar.write(
+    "La prima pagina contiene delle statistiche ISTAT, mentre la seconda è una dashboard interattiva.")
+st.sidebar.write(
+"È possibile interagire con la mappa di Cuneo: cliccando su un comune o selezionandolo nella barra di ricerca, verranno visualizzate le statistiche di riferimento.")
 
     
 
@@ -116,9 +119,10 @@ def mostra_info_comune(st_map, df):
 
 
 def main():
+    csv_path = os.path.join("dati", "migranti2.csv")
     # Caricamento dei dati
-    df = pd.read_csv('/Users/simone/Desktop/tirocinio/GitHub/dati/migranti2.csv')
-    provincia_geo = gdp.read_file('/Users/simone/Desktop/tirocinio/Dashboard/dati/limits_P_4_municipalities.geojson')
+    df = pd.read_csv(csv_path)
+    provincia_geo = "https://raw.githubusercontent.com/openpolis/geojson-italy/master/geojson/limits_P_4_municipalities.geojson"
 
     # Creazione della mappa
     map = folium.Map(location=[44.45807035, 7.858136691151624], zoom_start=8, scrollWheelZoom=False, tiles='CartoDB positron')
@@ -168,7 +172,7 @@ def main():
     
     with main1:
         with st.container(height = 500, border = False ):
-            st_map = st_folium(map, width=900, height=450)
+            st_map = st_folium(map, width=900, height=500)
 
 
     mostra_info_comune(st_map, df)

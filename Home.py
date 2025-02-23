@@ -105,28 +105,20 @@ with cent_co:
 
 img_folder = "img"
 
-# Verifica dell'esistenza della cartella e caricamento delle immagini
 if os.path.exists(img_folder):
-    # Creazione della lista dei file immagine con estensioni specifiche
     image_files = sorted([os.path.join(img_folder, f) for f in os.listdir(img_folder) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif'))])
 
-    # Verifica se sono presenti immagini nella cartella
     if image_files:
-        # Inizializzazione dello stato della sessione per il contatore, se non già presente
         if 'counter' not in st.session_state:
             st.session_state.counter = 0
 
         # Funzione per visualizzare l'immagine corrente
         def show_photo():
-            # Svuota il contenitore prima di mostrare la nuova immagine
             image_container.empty()
-            # Ottenimento del percorso dell'immagine corrente
             photo = image_files[st.session_state.counter]
-            # Visualizzazione dell'immagine con didascalia nel contenitore dedicato
             image_container.image(photo, caption=os.path.basename(photo))
 
-        # Visualizzazione iniziale dell'immagine
-        #show_photo()
+        show_photo()
 
         # Pulsante per mostrare l'immagine successiva, posizionato nella colonna di destra
         with last_co:

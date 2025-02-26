@@ -10,7 +10,7 @@ import requests
 import streamlit as st 
 from streamlit_folium import st_folium 
 
-st.set_page_config(page_title="Dashboard Migranti", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="MasterAdabi", layout="wide", initial_sidebar_state="expanded")
 
 
 st.markdown(
@@ -95,49 +95,60 @@ st.sidebar.write(
 st.sidebar.write(
     "La prima pagina contiene delle statistiche ISTAT, mentre la seconda è una dashboard interattiva.")
 st.sidebar.write(
-"È possibile interagire con la mappa di Cuneo: cliccando su un comune, verranno visualizzate le statistiche di riferimento.")
+"È possibile interagire con la mappa di Cuneo: cliccando su un comune o selezionandolo nella barra di ricerca, verranno visualizzate le statistiche di riferimento.")
 
+    
 left_co, cent_co, last_co = st.columns([1, 3, 1])
 
 with cent_co:
     st.title(":green[IMM]IGR:red[ITALY]")
     image_container = st.container()  # Contenitore dedicato per l'immagine
 
+@st.cache_data
+def get_image_files(folder):
+    """Funzione che restituisce la lista ordinata dei file immagine presenti nella cartella, oppure una lista vuota se la cartella non esiste."""
+    if os.path.exists(folder):
+        return sorted([
+            os.path.join(folder, f) 
+            for f in os.listdir(folder) 
+            if f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif'))
+        ])
+    return []
+
+# Definizione della cartella contenente le immagini
 img_folder = "img"
 
-if os.path.exists(img_folder):
-    image_files = sorted([os.path.join(img_folder, f) for f in os.listdir(img_folder) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif'))])
+# Recupero della lista delle immagini dalla cache
+image_files = get_image_files(img_folder)
 
-    if image_files:
-        if 'counter' not in st.session_state:
-            st.session_state.counter = 0
+# Verifica se sono presenti immagini
+if image_files:
+    # Inizializzazione del contatore nella sessione, se non già presente
+    if 'counter' not in st.session_state:
+        st.session_state.counter = 0
 
-        # Funzione per visualizzare l'immagine corrente
-        def show_photo():
-            image_container.empty()
-            photo = image_files[st.session_state.counter]
-            image_container.image(photo, caption=os.path.basename(photo))
+    # Funzione per visualizzare l'immagine corrente
+    def show_photo():
+        image_container.empty()
+        photo = image_files[st.session_state.counter]
+        image_container.image(photo, caption=os.path.basename(photo))
 
-        show_photo()
+    show_photo()
 
-        # Pulsante per mostrare l'immagine successiva, posizionato nella colonna di destra
-        with last_co:
-            if st.button("⏭️"):
-                # Incrementa il contatore prima di mostrare la nuova immagine
-                st.session_state.counter = (st.session_state.counter + 1) % len(image_files)
-                show_photo()
-    else:
-        # Messaggio informativo se non sono presenti immagini nella cartella
-        with cent_co:
-            st.info("Nessuna immagine trovata nella cartella 'img'.")
+    # Pulsante per passare all'immagine successiva, posizionato nella colonna di destra
+    with last_co:
+        if st.button("⏭️"):
+            st.session_state.counter = (st.session_state.counter + 1) % len(image_files)
+            show_photo()
 else:
-    # Messaggio informativo se la cartella non esiste
+    # Messaggio informativo se non sono presenti immagini nella cartella
     with cent_co:
-        st.info("La cartella 'img' non esiste. Assicurati che sia presente nella directory principale dell'applicazione.")
+        st.info("Nessuna immagine trovata nella cartella 'img'.")
+
         
 st.markdown("<div class='title-container'>L'immigrazione straniera in numeri</div>", unsafe_allow_html=True)
 
-col_map1, col_map2 = st.columns([1.5, 1.5])  # Due colonne: numeri e mappa
+col_map1, col_map2 = st.columns([1, 2])  # Due colonne: numeri e mappa
 
 with col_map1:
     st.markdown('<div class="custom-container"><h3>Alcuni dati</h3></div>', unsafe_allow_html=True)
@@ -172,28 +183,34 @@ with col_map1:
         </div>
     """, unsafe_allow_html=True)
 
-# ✅ 3. Dati popolazione per regione
-data_regioni = {
-    "Regione": ["Piemonte", "Valle d'Aosta/Vallée d'Aoste", "Liguria", "Lombardia", "Trentino-Alto Adige/Südtirol", 
-                "Veneto", "Friuli-Venezia Giulia", "Emilia-Romagna",
-                "Toscana", "Umbria", "Marche", "Lazio", "Abruzzo", "Molise", "Campania", 
-                "Puglia", "Basilicata", "Calabria", "Sicilia", "Sardegna"],
-    "Immigrati": [428905, 8568, 155646, 1203138, 102890, 501161, 120144, 560953, 
-                  424066, 88579, 132011, 643312, 85828, 13231, 263680, 147269, 25410, 99907, 196919, 52041]
-}
+@st.cache_data
+def load_regioni_data():
+    data_regioni = {
+        "Regione": ["Piemonte", "Valle d'Aosta/Vallée d'Aoste", "Liguria", "Lombardia", "Trentino-Alto Adige/Südtirol", 
+                    "Veneto", "Friuli-Venezia Giulia", "Emilia-Romagna",
+                    "Toscana", "Umbria", "Marche", "Lazio", "Abruzzo", "Molise", "Campania", 
+                    "Puglia", "Basilicata", "Calabria", "Sicilia", "Sardegna"],
+        "Immigrati": [428905, 8568, 155646, 1203138, 102890, 501161, 120144, 560953, 
+                      424066, 88579, 132011, 643312, 85828, 13231, 263680, 147269, 25410, 99907, 196919, 52041]
+    }
+    df = pd.DataFrame(data_regioni)
+    totale_immigrati = df["Immigrati"].sum()
+    df["Percentuale"] = (df["Immigrati"] / totale_immigrati) * 100
+    return df
 
-df_regioni = pd.DataFrame(data_regioni)
+df_regioni = load_regioni_data()
 
-# ✅ 4. Calcolare la percentuale per ogni regione
-totale_immigrati = df_regioni["Immigrati"].sum()
-df_regioni["Percentuale"] = (df_regioni["Immigrati"] / totale_immigrati) * 100
+
 migranti_dict = df_regioni.set_index("Regione")[["Immigrati", "Percentuale"]].to_dict(orient="index")
 
 
-# ✅ 5. Scaricare il GeoJSON delle regioni italiane
-geojson_url = "https://raw.githubusercontent.com/openpolis/geojson-italy/master/geojson/limits_IT_regions.geojson"
-response = requests.get(geojson_url)
-italy_geojson = response.json()
+@st.cache_data
+def load_geojson(url):
+    response = requests.get(url)
+    return response.json()
+
+italy_geojson = load_geojson("https://raw.githubusercontent.com/openpolis/geojson-italy/master/geojson/limits_IT_regions.geojson")
+
 
 for feature in italy_geojson["features"]:
     regione = feature["properties"]["reg_name"]
@@ -201,10 +218,8 @@ for feature in italy_geojson["features"]:
         feature["properties"]["Immigrati"] = f"{migranti_dict[regione]['Immigrati']:,}"  # 🔹 Numero con separatore di migliaia
         feature["properties"]["Percentuale"] = f"{migranti_dict[regione]['Percentuale']:.2f}%"  # 🔹 Percentuale formattata
 
-# ✅ 6. Creare la mappa con Folium
 m = folium.Map(location=[42, 12], zoom_start=4.5, tiles="cartodb positron", draggin = False,  scrollWheelZoom=False,)
 
-# ✅ 7. Aggiungere la mappa coropletica con percentuale
 choropleth = folium.Choropleth(
     geo_data=italy_geojson,
     name="choropleth",
@@ -234,49 +249,49 @@ folium.GeoJson(
     )
 ).add_to(m)
 
-# ✅ 10. Mostrare la mappa in Streamlit
 with col_map2:
-        with st.container(height = 700, border = False ):
-            st_map = st_folium(m, width=900, height=700)
+        with st.container(height = 600, border = False ):
+            st_map = st_folium(m, width=900, height=600)
 
 
 st.markdown('<div class="title-container">Stranieri residenti al 1° gennaio 2024</div>', unsafe_allow_html=True)
 st.markdown('<div class="grid-container">', unsafe_allow_html=True)
 
-# Creazione del dataset
-data = {
-    "Paese": [
-        "Romania", "Albania", "Marocco", "Cina", "Ucraina",
-        "Bangladesh", "India", "Egitto", "Pakistan", "Filippine",
-        "Nigeria", "Senegal", "Sri Lanka", "Tunisia", "Perù",
-        "Moldova", "Polonia", "Ecuador", "Brasile", "Macedonia",
-        "Bulgaria", "Ghana", "Russia", "Kosovo", "Germania",
-        "Georgia", "Costa d'Avorio", "Francia", "Repubblica Dominicana",
-        "Serbia", "Spagna", "Regno Unito", "Gambia", "Cuba",
-        "El Salvador", "Mali", "Colombia", "Turchia", "Iran",
-        "Bosnia-Erzegovina", "Algeria", "Afghanistan", "Burkina Faso",
-        "Camerun", "Stati Uniti", "Croazia", "Argentina", "Venezuela",
-        "Guinea", "Bolivia", "Bielorussia"
-    ],
-    "Popolazione": [
-        1073196, 416229, 412346, 308984, 273484,
-        192678, 170880, 161551, 159332, 156642,
-        128487, 115047, 110532, 110395, 105265,
-        102667, 73320, 59394, 51918, 49366,
-        48659, 46529, 41631, 36046, 35104,
-        33674, 31816, 30896, 29791, 29679,
-        28932, 26202, 24779, 24756, 24349,
-        23233, 23155, 21611, 19887, 19577,
-        19142, 17642, 16768, 16570, 16534,
-        15349, 15342, 15003, 13670, 12478,
-        9505
-    ]
-}
+@st.cache_data
+def load_foreigners_data():
+    data = {
+        "Paese": [
+            "Romania", "Albania", "Marocco", "Cina", "Ucraina",
+            "Bangladesh", "India", "Egitto", "Pakistan", "Filippine",
+            "Nigeria", "Senegal", "Sri Lanka", "Tunisia", "Perù",
+            "Moldova", "Polonia", "Ecuador", "Brasile", "Macedonia",
+            "Bulgaria", "Ghana", "Russia", "Kosovo", "Germania",
+            "Georgia", "Costa d'Avorio", "Francia", "Repubblica Dominicana",
+            "Serbia", "Spagna", "Regno Unito", "Gambia", "Cuba",
+            "El Salvador", "Mali", "Colombia", "Turchia", "Iran",
+            "Bosnia-Erzegovina", "Algeria", "Afghanistan", "Burkina Faso",
+            "Camerun", "Stati Uniti", "Croazia", "Argentina", "Venezuela",
+            "Guinea", "Bolivia", "Bielorussia"
+        ],
+        "Popolazione": [
+            1073196, 416229, 412346, 308984, 273484,
+            192678, 170880, 161551, 159332, 156642,
+            128487, 115047, 110532, 110395, 105265,
+            102667, 73320, 59394, 51918, 49366,
+            48659, 46529, 41631, 36046, 35104,
+            33674, 31816, 30896, 29791, 29679,
+            28932, 26202, 24779, 24756, 24349,
+            23233, 23155, 21611, 19887, 19577,
+            19142, 17642, 16768, 16570, 16534,
+            15349, 15342, 15003, 13670, 12478,
+            9505
+        ]
+    }
+    df = pd.DataFrame(data)
+    return df.sort_values("Popolazione", ascending=True)
 
-df = pd.DataFrame(data)
+df = load_foreigners_data()
 
-# Ordina i dati in base alla popolazione per migliorare la leggibilità
-df = df.sort_values("Popolazione", ascending=True)
 
 # Creazione del grafico Altair
 chart = alt.Chart(df).mark_bar().encode(
@@ -287,12 +302,13 @@ chart = alt.Chart(df).mark_bar().encode(
         alt.Tooltip("Popolazione:Q", title="Popolazione", format=",")
     ]).properties(
     width=700,
-    height=600,
-    title="Popolazione per Paese di cittadinanza"
-).configure_title(
+    height=600,title={
+    "text": "Popolazione per Paese di cittadinanza", 
+    "subtitle": "Fonte: Elaborazioni su dati ISTAT "
+    }).configure_title(
         anchor='middle'
     )
-
+    
 # Streamlit UI
 st.altair_chart(chart, use_container_width=True)
 
@@ -301,12 +317,16 @@ st.markdown('<div class="grid-container">', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns([1,1,1])  # La colonna 1 è più larga per ospitare i due grafici
 
-# 🔹 **Grafico 1: Sbarchi (2000-2022)**
-df_sbarchi = pd.DataFrame({
-    "Anno": list(range(2000, 2023)),
-    "Sbarchi": [26817, 20143, 23719, 14331, 13635, 22939, 22016, 20455, 36951, 9537, 4406, 62692,
-                13267, 42925, 170100, 153842, 181436, 119369, 23370, 11471, 34154, 67477, 105129]
-})
+@st.cache_data
+def sbarchi():
+    df_sbarchi = pd.DataFrame({
+        "Anno": list(range(2000, 2023)),
+        "Sbarchi": [26817, 20143, 23719, 14331, 13635, 22939, 22016, 20455, 36951, 9537, 4406, 62692,
+                    13267, 42925, 170100, 153842, 181436, 119369, 23370, 11471, 34154, 67477, 105129]
+    }) 
+    return df_sbarchi
+    
+df_sbarchi = sbarchi()
 
 chart_sbarchi = alt.Chart(df_sbarchi).mark_line(point=True).encode(
     x=alt.X("Anno:O", title="Anno"),
@@ -319,18 +339,23 @@ chart_sbarchi = alt.Chart(df_sbarchi).mark_line(point=True).encode(
 with col2:
     st.altair_chart(chart_sbarchi, use_container_width=True)
 
-# 🔹 **Grafico 2: Popolazione straniera (2002-2019)**
-df_popolazione = pd.DataFrame({
-    "Anno": list(range(2002, 2020)),
-    "Maschi": [665663, 738644, 939459, 1131951, 1235134, 1318952, 1528676, 1713842, 1828641, 1930140,
-               2022797, 2168037, 2252743, 2270954, 2277217, 2284218, 2338162, 2414285],
-    "Femmine": [675751, 744633, 954468, 1137067, 1263277, 1373070, 1622877, 1845011, 2007708, 2171195,
-                2296404, 2442456, 2534423, 2564291, 2553825, 2534415, 2545289, 2581873],
-    "Totale": [1341414, 1483277, 1893927, 2269018, 2498411, 2692022, 3151553, 3558853, 3836349, 4101335,
-               4319201, 4610493, 4787166, 4835245, 4831042, 4818633, 4883451, 4996158]
-})
+# **Grafico 2: Popolazione straniera (2002-2019)**
+@st.cache_data
+def prepare_chart_data():
+    # Esempio per il grafico di popolazione straniera
+    df_popolazione = pd.DataFrame({
+        "Anno": list(range(2002, 2020)),
+        "Maschi": [665663, 738644, 939459, 1131951, 1235134, 1318952, 1528676, 1713842, 1828641, 1930140,
+                2022797, 2168037, 2252743, 2270954, 2277217, 2284218, 2338162, 2414285],
+        "Femmine": [675751, 744633, 954468, 1137067, 1263277, 1373070, 1622877, 1845011, 2007708, 2171195,
+                    2296404, 2442456, 2534423, 2564291, 2553825, 2534415, 2545289, 2581873],
+        "Totale": [1341414, 1483277, 1893927, 2269018, 2498411, 2692022, 3151553, 3558853, 3836349, 4101335,
+                4319201, 4610493, 4787166, 4835245, 4831042, 4818633, 4883451, 4996158]
+    })
+    df_popolazione = df_popolazione.melt("Anno", var_name="Categoria", value_name="Popolazione")
+    return df_popolazione
 
-df_popolazione = df_popolazione.melt("Anno", var_name="Categoria", value_name="Popolazione")
+df_popolazione = prepare_chart_data()
 
 chart_popolazione = alt.Chart(df_popolazione).mark_line(point=True).encode(
     x=alt.X("Anno:O", title="Anno"),

@@ -20,9 +20,9 @@ import folium
 import altair as alt
 
 
-st.set_page_config(page_title="Dashboard Lavoratori", layout="wide")
-st.title('Dashboard Operai Agricoli Nella Provincia del Cunese')
-st.caption('Mappa Cuneo')
+st.set_page_config(page_title="MasterAdabi", layout="wide")
+st.title('Dashboard Operai Agricoli Nella Provincia del Cuneese')
+st.caption('Mappa di Cuneo interattiva')
 
 st.sidebar.title('Master ADABI')
 st.sidebar.write(
@@ -67,7 +67,7 @@ def mostra_info_comune(st_map, df):
     if nome_comune:
         if nome_comune in df['comune_pdf'].values:
             numero_teste = df[df['comune_pdf'] == nome_comune]['conta'].values[0]
-            st.subheader(f'Statistiche il comune di {nome_comune}:')
+            st.subheader(f'Statistiche per il comune di {nome_comune}:')
             st.metric(label="Numero di lavoratori:", value=numero_teste)
 
             st.subheader(f'Grafici per il comune di {nome_comune}:')
@@ -80,17 +80,21 @@ def mostra_info_comune(st_map, df):
                 color='genere'
             )
 
-            # Preparazione dei dati per il grafico a torta
+            dominio_provenienza = ["Euro-est", "Italia", "India", "Africa", "Sub-shara", "Americhe"]
+            range_colori = ["#1f77b4", "#3c9c2d", "#d1ce24", "#d62728", "#db8318","#0e8a81"]
+
             provenienza_counts = df_comune['provenienza'].value_counts().reset_index()
             provenienza_counts.columns = ['provenienza', 'values']
 
-            # Creazione del grafico a torta
+            # Creazione del grafico a torta con scala colori fissa
             base = alt.Chart(provenienza_counts).encode(
                 theta=alt.Theta("values:Q", stack=True),
                 radius=alt.Radius("values:Q", scale=alt.Scale(type="sqrt", zero=True, rangeMin=50)),
-                color=alt.Color("provenienza:N", legend=alt.Legend(title="Provenienza"))
+                color=alt.Color("provenienza:N", scale=alt.Scale(domain=dominio_provenienza, range=range_colori),
+                                legend=alt.Legend(title="Provenienza"))
             )
 
+            # Definizione dei layer per la visualizzazione del grafico
             c1 = base.mark_arc(innerRadius=20, stroke="#fff")
             c2 = base.mark_text(radiusOffset=10).encode(text="values:Q")
 
@@ -120,12 +124,26 @@ def mostra_info_comune(st_map, df):
 
 def main():
     csv_path = os.path.join("dati", "migranti2.csv")
-    # Caricamento dei dati
+    azienda_path = os.path.join("dati", "dataset_aziende2.csv")
     df = pd.read_csv(csv_path)
-    provincia_geo = "https://raw.githubusercontent.com/openpolis/geojson-italy/master/geojson/limits_P_4_municipalities.geojson"
+    df_aziende = pd.read_csv(azienda_path)
+    df_aziende['Comune_Azienda'] = df_aziende['Comune_Azienda'].str.capitalize()
+    conta_aziende = df_aziende['Comune_Azienda'].value_counts().reset_index()
+    conta_aziende.columns = ['Comune_Azienda', 'conta_aziende']
+    df_aziende = df_aziende.merge(conta_aziende, on='Comune_Azienda', how='left')
+
+
+    @st.cache_data
+    def load_geojson(url):
+        response = requests.get(url)
+        return response.json()
+
+    provincia_geo = load_geojson("https://raw.githubusercontent.com/openpolis/geojson-italy/master/geojson/limits_P_4_municipalities.geojson")
+
 
     # Creazione della mappa
-    map = folium.Map(location=[44.45807035, 7.858136691151624], zoom_start=8, scrollWheelZoom=False, tiles='CartoDB positron')
+
+    mappa_cuneo = folium.Map(location=[44.45807035, 7.858136691151624], zoom_start=8, scrollWheelZoom=False, tiles='CartoDB positron')
     
     max_val = df['conta'].max()
     bins = [0, 50, 100, 200, 350, 500, 1000]
@@ -140,39 +158,39 @@ def main():
         nan_fill_color="white",
         nan_fill_opacity= 0.5,
         line_opacity=0.8,
-        legend_name='Numero Teste Per Comune',
+        legend_name='Lavoratori Per Comune',
         highlight=True,
         threshold_scale = bins,
-    ).add_to(map)
-    choropleth.geojson.add_to(map)
+        name = 'lavoratori'
+    ).add_to(mappa_cuneo)
+    
     choropleth.geojson.add_child(
-        folium.features.GeoJsonTooltip(['name'], labels=False),
-        folium.LayerControl().add_to(map)
-    )
+        folium.features.GeoJsonTooltip(['name'], labels=False))
     
-    folium.LayerControl().add_to(map)
+    mappa_aziende = folium.Choropleth(
+        geo_data=provincia_geo,
+        data=df_aziende,
+        columns=['Comune_Azienda', 'conta_aziende'],
+        key_on='feature.properties.name',
+        nan_fill_color="white",
+        nan_fill_opacity= 0.5,
+        line_opacity=0.8,
+        legend_name='Aziende nel territorio',
+        overlay=True,
+        fill_color= 'Purples',
+        highlight=True,
+        name = 'aziende'
+    ).add_to(mappa_cuneo)
+    
+    mappa_aziende.geojson.add_child(
+        folium.features.GeoJsonTooltip(['name'], labels=False))
+    
+    folium.LayerControl(position='bottomleft', collapsed=False, name = 'layer').add_to(mappa_cuneo)
 
-    #aggiunta del css perche la mappa andava fuori il container
-    st.markdown("""
-        <style>
-            .streamlit-expanderHeader {
-                padding-bottom: 0;
-            }
-            .folium-map {
-                height: 100% !important;
-                margin-bottom: 0 !important;
-                padding: 0 !important;
-            }
-            .stContainer {
-                height: 500px;
-                overflow: hidden;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-    
+            
     with main1:
-        with st.container(height = 500, border = False ):
-            st_map = st_folium(map, width=900, height=500)
+        with st.container(height = 550, border = False ):
+            st_map = st_folium(mappa_cuneo, width=900, height=500)
 
 
     mostra_info_comune(st_map, df)

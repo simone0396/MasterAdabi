@@ -35,35 +35,28 @@ st.sidebar.write(
     
 
 # ==========================
-# Funzione principale
-# ==========================
+# Funzione 
+
 main1, main2 = st.columns([3,1])  # La colonna 1 è più larga per ospitare i due grafici
 
-def mostra_info_comune(st_map, df):
-    # Creazione della lista dei comuni
+def mostra_info_comune(st_map, df, df_aziende):
     comune_list = [''] + list(df['comune_pdf'].unique())
     comune_list.sort()
 
-    # Controllo se esiste una selezione valida dalla mappa
     map_comune = ''
     if st_map.get('last_active_drawing'):
         map_comune = st_map['last_active_drawing']['properties']['name']
 
-    # Se map_comune è None o una stringa vuota, non fare nulla (o usa un valore predefinito)
     if not map_comune:
         map_comune = ''
 
-    # Se non è stato selezionato nessun comune dalla mappa, la selectbox sarà vuota
     selected_comune = map_comune if map_comune in comune_list else ''
 
-    # Selezione del comune tramite selectbox
     with main2:
         selected_comune = st.selectbox('Seleziona un Comune', comune_list, index=comune_list.index(selected_comune) if selected_comune in comune_list else 0)
 
-    # Determinazione del comune da visualizzare (priorità alla selezione dalla selectbox)
     nome_comune = selected_comune
 
-    # Verifica se un comune è stato selezionato e se ci sono dati per il comune selezionato
     if nome_comune:
         if nome_comune in df['comune_pdf'].values:
             numero_teste = df[df['comune_pdf'] == nome_comune]['conta'].values[0]
@@ -73,7 +66,6 @@ def mostra_info_comune(st_map, df):
             st.subheader(f'Grafici per il comune di {nome_comune}:')
             df_comune = df[df['comune_pdf'] == nome_comune]
 
-            # Grafico a barre per gruppi di età e genere
             chart_hist = alt.Chart(df_comune).mark_bar().encode(
                 y=alt.Y('count()', title='Frequenza'),
                 x=alt.X('classe_eta', title='Gruppi Di Età', bin=False),
@@ -81,12 +73,11 @@ def mostra_info_comune(st_map, df):
             )
 
             dominio_provenienza = ["Euro-est", "Italia", "India", "Africa", "Sub-shara", "Americhe"]
-            range_colori = ["#1f77b4", "#3c9c2d", "#d1ce24", "#d62728", "#db8318","#0e8a81"]
+            range_colori = ["#1f77b4", "#3c9c2d", "#d1ce24", "#d62728", "#db8318", "#0e8a81"]
 
             provenienza_counts = df_comune['provenienza'].value_counts().reset_index()
             provenienza_counts.columns = ['provenienza', 'values']
 
-            # Creazione del grafico a torta con scala colori fissa
             base = alt.Chart(provenienza_counts).encode(
                 theta=alt.Theta("values:Q", stack=True),
                 radius=alt.Radius("values:Q", scale=alt.Scale(type="sqrt", zero=True, rangeMin=50)),
@@ -94,32 +85,56 @@ def mostra_info_comune(st_map, df):
                                 legend=alt.Legend(title="Provenienza"))
             )
 
-            # Definizione dei layer per la visualizzazione del grafico
             c1 = base.mark_arc(innerRadius=20, stroke="#fff")
             c2 = base.mark_text(radiusOffset=10).encode(text="values:Q")
-
             chart_pie = c1 + c2
 
-            # Grafico a barre per età e genere
+            # Aggiungi logica per aggiornare la cittadinanza se la provenienza è "Italia"
+            df_comune['cittadinanza'] = df_comune.apply(
+                lambda row: 'Italia' if row['provenienza'] == 'Italia' and row['cittadinanza'] != 'Italia' else row['cittadinanza'],
+                axis=1
+            )
+
             chart_hist_eta = alt.Chart(df_comune).mark_bar().encode(
                 y=alt.Y('count()', title='Frequenza'),
                 x=alt.X('eta', title='Età', bin=False),
                 color=alt.Color('genere', scale=alt.Scale(scheme='category10'))
             )
 
-            # Creazione delle colonne
-            col1, col2 = st.columns(2)
+            cittadinanza_counts = df_comune['cittadinanza'].value_counts().reset_index()
+            cittadinanza_counts.columns = ['cittadinanza', 'values']
+            
+            # Crea il grafico delle cittadinanze
+            chart_cittadinanza = alt.Chart(cittadinanza_counts).mark_bar().encode(
+                x=alt.X('cittadinanza:N', title='Cittadinanza', sort='-y'),
+                y=alt.Y('values:Q', title='Numero di residenti'),
+                color=alt.Color('cittadinanza:N', scale=alt.Scale(scheme='category20'))
+            ).properties(title='Distribuzione delle Cittadinanze')
 
-            # Inserimento dei grafici nelle colonne
+            col1, col2 = st.columns(2)
             col1.altair_chart(chart_hist, theme="streamlit", use_container_width=True)
             col2.altair_chart(chart_pie, theme="streamlit", use_container_width=True)
             st.altair_chart(chart_hist_eta, theme="streamlit", use_container_width=True)
+            st.altair_chart(chart_cittadinanza, theme="streamlit", use_container_width=True)
+
+        aziende_comune = df_aziende[df_aziende['Comune_Azienda'] == nome_comune]
+
+        if not aziende_comune.empty:
+            numero_aziende = len(aziende_comune)
+            st.subheader(f'Aziende nel comune di {nome_comune} ({numero_aziende} aziende trovate):')
+            aziende_comune['Nome_Azienda'] = aziende_comune['Nome_Azienda'].str.title()
+
+            colonne_da_escludere = ['conta_aziende']
+            colonne_da_escludere = [col for col in colonne_da_escludere if col in aziende_comune.columns]
+
+            aziende_comune_visual = aziende_comune.drop(columns=colonne_da_escludere)
+            st.dataframe(aziende_comune_visual, use_container_width=True)
         else:
-            if map_comune:
-                st.subheader(f'Le informazioni per il comune di {nome_comune} non sono presenti nel Database 1')
+            st.write("Nessuna azienda trovata per questo comune.")
     else:
         if map_comune:
             st.subheader(f'Le informazioni per il comune di {map_comune} non sono presenti nel Database')
+
 
 
 def main():
@@ -193,7 +208,7 @@ def main():
             st_map = st_folium(mappa_cuneo, width=900, height=500)
 
 
-    mostra_info_comune(st_map, df)
+    mostra_info_comune(st_map, df, df_aziende)
 
 if __name__ == "__main__":
     main()
